@@ -4,9 +4,9 @@
  * 或
  * pnpm ts-node src/main.ts
  */
-import { BINANCE_CONFIG, TRADING_CONFIG } from './config/index.js';
-import { logger, createLogger } from './utils/logger.js';
-import { BinanceService, type MarketType } from './services/binance.service.js';
+import { BINANCE_CONFIG, TRADING_CONFIG, MarketType } from './config/index.js';
+import { createLogger } from './utils/logger.js';
+import { BinanceService } from './services/binance.service.js';
 
 // 创建专用logger
 const mainLogger = createLogger({ prefix: '[Main]' });
