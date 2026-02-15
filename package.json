@@ -4,7 +4,7 @@
   "description": "币安订单簿实时监控",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "ts-node --esm src/main.ts",
+    "dev": "ts-node src/main.ts",
     "build": "tsc",
     "start": "node dist/main.js",
     "test": "vitest",
@@ -13,7 +13,6 @@
   "keywords": ["binance", "orderbook", "trading"],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@binance/connector-typescript": "^0.3.16",
     "dotenv": "^16.4.7"
