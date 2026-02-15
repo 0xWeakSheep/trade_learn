@@ -4,13 +4,8 @@
  * Encapsulates Binance API calls for order book data retrieval
  */
 import { Spot } from '@binance/connector-typescript';
-import { BINANCE_CONFIG, TRADING_CONFIG } from '../config/index';
+import { BINANCE_CONFIG, TRADING_CONFIG, MarketType } from '../config/index';
 import { logger, type FormattedOrderBook } from '../utils/logger';
-
-/**
- * Market type
- */
-export type MarketType = 'SPOT' | 'FUTURES';
 
 /**
  * Order book response from Binance API
@@ -33,7 +28,7 @@ export class BinanceService {
    * Create Binance service instance
    * @param marketType Market type: 'SPOT' or 'FUTURES'
    */
-  constructor(marketType: MarketType = 'SPOT') {
+  constructor(marketType: MarketType = MarketType.SPOT) {
     this.marketType = marketType;
     this.spotClient = new Spot(
       BINANCE_CONFIG.API_KEY,
@@ -179,4 +174,5 @@ export function createBinanceService(marketType?: MarketType): BinanceService {
   return new BinanceService(marketType);
 }
 
+export { MarketType } from '../config/index.js';
 export default BinanceService;
