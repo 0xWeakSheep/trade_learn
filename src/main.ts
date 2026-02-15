@@ -6,7 +6,7 @@
  */
 import { BINANCE_CONFIG, TRADING_CONFIG, APP_CONFIG } from './config/index.js';
 import { logger, createLogger } from './utils/logger.js';
-import { BinanceService, MarketType } from './services/binance.service.js';
+import { BinanceService, type MarketType } from './services/binance.service.js';
 
 // 创建专用logger
 const mainLogger = createLogger({ prefix: '[Main]' });

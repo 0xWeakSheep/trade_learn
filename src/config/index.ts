@@ -5,6 +5,14 @@ import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 /**
+ * Market type enum
+ */
+export enum MarketType {
+  SPOT = 'SPOT',
+  FUTURES = 'FUTURES',
+}
+
+/**
  * Trading pair configuration
  */
 export const TRADING_CONFIG = {
@@ -14,6 +22,8 @@ export const TRADING_CONFIG = {
   DEFAULT_DEPTH_LIMIT: parseInt(process.env.DEFAULT_DEPTH_LIMIT || '20', 10),
   /** Supported depth limits by Binance API */
   SUPPORTED_DEPTH_LIMITS: [5, 10, 20, 50, 100, 500, 1000, 5000] as const,
+  /** Default market type */
+  DEFAULT_MARKET_TYPE: (process.env.MARKET_TYPE as MarketType) || MarketType.SPOT,
 } as const;
 
 /**
@@ -26,8 +36,12 @@ export const BINANCE_CONFIG = {
   SECRET_KEY: process.env.BINANCE_SECRET_KEY || '',
   /** Base URL for Binance Spot API */
   BASE_URL: 'https://api.binance.com',
-  /** WebSocket base URL for Binance Stream */
+  /** Base URL for Binance Futures API */
+  FUTURES_BASE_URL: 'https://fapi.binance.com',
+  /** WebSocket base URL for Binance Spot Stream */
   WS_BASE_URL: 'wss://stream.binance.com:9443/ws',
+  /** WebSocket base URL for Binance Futures Stream */
+  FUTURES_WS_BASE_URL: 'wss://fstream.binance.com/ws',
   /** Request timeout in milliseconds */
   TIMEOUT: 30000,
 } as const;
@@ -70,6 +84,3 @@ export function validateConfig(): void {
 export function isValidDepthLimit(limit: number): boolean {
   return TRADING_CONFIG.SUPPORTED_DEPTH_LIMITS.includes(limit as typeof TRADING_CONFIG.SUPPORTED_DEPTH_LIMITS[number]);
 }
-
-// Re-export all configurations for convenience
-export { BINANCE_CONFIG, TRADING_CONFIG, APP_CONFIG };

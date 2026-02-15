@@ -5,35 +5,43 @@
  * pnpm test:run tests/config.test.ts
  */
 import { describe, it, expect, vi } from 'vitest';
-import type { Config, MarketType } from '../src/config/index.js';
-
-// 测试配置模块的功能
-// 注意: 由于config模块在加载时就读取环境变量，我们主要测试类型和工具函数
+import {
+  TRADING_CONFIG,
+  BINANCE_CONFIG,
+  APP_CONFIG,
+  MarketType,
+  validateConfig,
+  isValidDepthLimit,
+} from '../src/config/index.js';
 
 describe('Config Module', () => {
   /**
-   * 测试: 配置类型定义正确
+   * 测试: TRADING_CONFIG 配置正确
    */
-  it('应该具有正确的配置类型结构', () => {
-    const mockConfig: Config = {
-      api: {
-        key: 'test-key',
-        secret: 'test-secret',
-      },
-      trading: {
-        symbol: 'BTCUSDT',
-        depthLimit: 20,
-        marketType: MarketType.SPOT,
-      },
-      app: {
-        env: 'test',
-      },
-    };
+  it('应该具有正确的交易配置默认值', () => {
+    expect(TRADING_CONFIG.DEFAULT_SYMBOL).toBe('BTCUSDT');
+    expect(TRADING_CONFIG.DEFAULT_DEPTH_LIMIT).toBe(20);
+    expect(TRADING_CONFIG.SUPPORTED_DEPTH_LIMITS).toContain(5);
+    expect(TRADING_CONFIG.SUPPORTED_DEPTH_LIMITS).toContain(20);
+    expect(TRADING_CONFIG.SUPPORTED_DEPTH_LIMITS).toContain(100);
+  });
 
-    expect(mockConfig).toBeDefined();
-    expect(mockConfig.api.key).toBe('test-key');
-    expect(mockConfig.trading.symbol).toBe('BTCUSDT');
-    expect(mockConfig.trading.marketType).toBe(MarketType.SPOT);
+  /**
+   * 测试: BINANCE_CONFIG 配置正确
+   */
+  it('应该具有正确的API配置', () => {
+    expect(BINANCE_CONFIG.BASE_URL).toBe('https://api.binance.com');
+    expect(BINANCE_CONFIG.FUTURES_BASE_URL).toBe('https://fapi.binance.com');
+    expect(BINANCE_CONFIG.TIMEOUT).toBe(30000);
+  });
+
+  /**
+   * 测试: APP_CONFIG 配置正确
+   */
+  it('应该具有正确的应用配置', () => {
+    expect(APP_CONFIG.NODE_ENV).toBeDefined();
+    expect(APP_CONFIG.IS_DEV).toBeDefined();
+    expect(APP_CONFIG.IS_PROD).toBeDefined();
   });
 
   /**
@@ -45,13 +53,13 @@ describe('Config Module', () => {
   });
 
   /**
-   * 测试: 深度限制选项
+   * 测试: isValidDepthLimit 函数
    */
-  it('应该支持标准的深度限制选项', () => {
-    const validLimits = [5, 10, 20, 50, 100, 500, 1000, 5000];
-
-    validLimits.forEach((limit) => {
-      expect(validLimits).toContain(limit);
-    });
+  it('应该正确验证深度限制值', () => {
+    expect(isValidDepthLimit(5)).toBe(true);
+    expect(isValidDepthLimit(20)).toBe(true);
+    expect(isValidDepthLimit(100)).toBe(true);
+    expect(isValidDepthLimit(999)).toBe(false);
+    expect(isValidDepthLimit(0)).toBe(false);
   });
 });

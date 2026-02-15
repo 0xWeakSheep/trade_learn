@@ -1,30 +1,37 @@
 /**
- * 运行命令:
- * pnpm ts-node --esm src/services/binance.service.ts
+ * Binance Service - Order Book API Wrapper
+ *
+ * Encapsulates Binance API calls for order book data retrieval
  */
-import {
-  Spot,
-  type OrderBookResponse,
-} from '@binance/connector-typescript';
-import { BINANCE_CONFIG, TRADING_CONFIG } from '../config/index.js';
-import { logger, type FormattedOrderBook } from '../utils/logger.js';
+import { Spot } from '@binance/connector-typescript';
+import { BINANCE_CONFIG, TRADING_CONFIG } from '../config/index';
+import { logger, type FormattedOrderBook } from '../utils/logger';
 
 /**
- * 市场类型
+ * Market type
  */
 export type MarketType = 'SPOT' | 'FUTURES';
 
 /**
- * 币安服务类
- * 封装币安API调用，提供订单簿数据获取功能
+ * Order book response from Binance API
+ */
+interface OrderBookResponse {
+  lastUpdateId: number;
+  bids: string[][];
+  asks: string[][];
+}
+
+/**
+ * Binance Service Class
+ * Encapsulates Binance API calls for order book data retrieval
  */
 export class BinanceService {
   private spotClient: Spot;
   private marketType: MarketType;
 
   /**
-   * 创建币安服务实例
-   * @param marketType 市场类型: 'SPOT' 或 'FUTURES'
+   * Create Binance service instance
+   * @param marketType Market type: 'SPOT' or 'FUTURES'
    */
   constructor(marketType: MarketType = 'SPOT') {
     this.marketType = marketType;
@@ -41,28 +48,28 @@ export class BinanceService {
   }
 
   /**
-   * 获取订单簿深度数据
-   * @param symbol 交易对，如 'BTCUSDT'
-   * @param limit 深度限制: 5, 10, 20, 50, 100, 500, 1000, 5000
-   * @returns 格式化的订单簿数据
+   * Get order book depth data
+   * @param symbol Trading pair, e.g., 'BTCUSDT'
+   * @param limit Depth limit: 5, 10, 20, 50, 100, 500, 1000, 5000
+   * @returns Formatted order book data
    */
   async getOrderBook(
     symbol: string = TRADING_CONFIG.DEFAULT_SYMBOL,
     limit: number = TRADING_CONFIG.DEFAULT_DEPTH_LIMIT
   ): Promise<FormattedOrderBook> {
     try {
-      // 标准化交易对格式
+      // Normalize trading pair format
       const formattedSymbol = symbol.toUpperCase();
 
       logger.debug(`Fetching order book for ${formattedSymbol} with limit ${limit}`);
 
-      // 调用币安API获取订单簿
+      // Call Binance API to get order book
       const response: OrderBookResponse = await this.spotClient.orderBook(
         formattedSymbol,
-        limit
+        { limit }
       );
 
-      // 转换为内部格式
+      // Convert to internal format
       return this.formatOrderBook(response, formattedSymbol);
     } catch (error) {
       logger.error(`Failed to fetch order book for ${symbol}:`, error);
@@ -73,7 +80,7 @@ export class BinanceService {
   }
 
   /**
-   * 格式化订单簿数据
+   * Format order book data
    */
   private formatOrderBook(
     response: OrderBookResponse,
@@ -82,24 +89,24 @@ export class BinanceService {
     return {
       symbol,
       lastUpdateId: response.lastUpdateId,
-      bids: response.bids.map(([price, quantity]) => ({
-        price,
-        quantity,
+      bids: response.bids.map((bid: string[]) => ({
+        price: bid[0],
+        quantity: bid[1],
       })),
-      asks: response.asks.map(([price, quantity]) => ({
-        price,
-        quantity,
+      asks: response.asks.map((ask: string[]) => ({
+        price: ask[0],
+        quantity: ask[1],
       })),
     };
   }
 
   /**
-   * 获取实时订单簿数据流
-   * 轮询方式获取最新数据
-   * @param symbol 交易对
-   * @param limit 深度限制
-   * @param intervalMs 轮询间隔(毫秒)
-   * @param callback 数据回调函数
+   * Get real-time order book data stream
+   * Poll for latest data
+   * @param symbol Trading pair
+   * @param limit Depth limit
+   * @param intervalMs Polling interval (milliseconds)
+   * @param callback Data callback function
    */
   async streamOrderBook(
     symbol: string = TRADING_CONFIG.DEFAULT_SYMBOL,
@@ -118,22 +125,22 @@ export class BinanceService {
           logger.error('Error in order book stream:', error);
         }
 
-        // 等待下一次轮询
+        // Wait for next poll
         await sleep(intervalMs);
       }
     };
 
-    // 启动轮询
+    // Start polling
     fetchLoop();
 
-    // 返回停止函数
+    // Return stop function
     return () => {
       isRunning = false;
     };
   }
 
   /**
-   * 设置市场类型
+   * Set market type
    */
   setMarketType(type: MarketType): void {
     this.marketType = type;
@@ -141,7 +148,7 @@ export class BinanceService {
   }
 
   /**
-   * 获取当前市场类型
+   * Get current market type
    */
   getMarketType(): MarketType {
     return this.marketType;
@@ -149,7 +156,7 @@ export class BinanceService {
 }
 
 /**
- * 币安服务错误类
+ * Binance service error class
  */
 export class BinanceServiceError extends Error {
   constructor(message: string) {
@@ -159,14 +166,14 @@ export class BinanceServiceError extends Error {
 }
 
 /**
- * 延迟函数
+ * Sleep/delay function
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * 创建币安服务实例
+ * Create Binance service instance
  */
 export function createBinanceService(marketType?: MarketType): BinanceService {
   return new BinanceService(marketType);
