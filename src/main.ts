@@ -19,7 +19,7 @@ function parseArgs(): { symbol: string; limit: number; marketType: MarketType } 
 
   let symbol = TRADING_CONFIG.DEFAULT_SYMBOL;
   let limit = 20; // 默认显示前20档
-  let marketType: MarketType = 'SPOT';
+  let marketType: MarketType = MarketType.SPOT;
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -33,10 +33,10 @@ function parseArgs(): { symbol: string; limit: number; marketType: MarketType } 
         break;
       case '--futures':
       case '-f':
-        marketType = 'FUTURES';
+        marketType = MarketType.FUTURES;
         break;
       case '--spot':
-        marketType = 'SPOT';
+        marketType = MarketType.SPOT;
         break;
       case '--help':
       case '-h':
@@ -203,6 +203,6 @@ async function main(): Promise<void> {
 
 // 运行应用
 main().catch((error) => {
-  logger.error('应用错误:', error);
+  console.error('应用错误:', error);
   process.exit(1);
 });
