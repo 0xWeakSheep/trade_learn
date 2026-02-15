@@ -1,0 +1,27 @@
+{
+  "name": "binance-orderbook",
+  "version": "1.0.0",
+  "description": "币安订单簿实时监控",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "ts-node --esm src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "keywords": ["binance", "orderbook", "trading"],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@binance/connector-typescript": "^0.3.16",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
