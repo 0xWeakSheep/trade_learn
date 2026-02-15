@@ -4,13 +4,17 @@
   "description": "币安订单簿实时监控",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "ts-node src/main.ts",
+    "dev": "tsx src/main.ts",
     "build": "tsc",
     "start": "node dist/main.js",
     "test": "vitest",
     "test:run": "vitest run"
   },
-  "keywords": ["binance", "orderbook", "trading"],
+  "keywords": [
+    "binance",
+    "orderbook",
+    "trading"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -20,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^22.13.1",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }

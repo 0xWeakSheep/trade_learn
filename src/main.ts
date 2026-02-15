@@ -98,10 +98,9 @@ function printOrderBook(
   console.log('='.repeat(80));
 
   // 表头
-  console.log(
-    '\x1b[31m%12s %15s %15s %10s\x1b[0m │ \x1b[32m%10s %15s %15s %12s\x1b[0m',
-    '卖价(Ask)', '数量', '累计', '', '', '买价(Bid)', '数量', '累计'
-  );
+  const askHeader = `${'卖价(Ask)'.padStart(12)} ${'数量'.padStart(15)} ${'累计'.padStart(15)}`;
+  const bidHeader = `${'买价(Bid)'.padStart(15)} ${'数量'.padStart(15)} ${'累计'.padStart(15)}`;
+  console.log(`\x1b[31m${askHeader}\x1b[0m │ \x1b[32m${bidHeader}\x1b[0m`);
   console.log('─'.repeat(80));
 
   // 计算累计
@@ -124,17 +123,10 @@ function printOrderBook(
     const bidPrice = parseFloat(bids[i].price);
     const bidQty = parseFloat(bids[i].quantity);
 
-    console.log(
-      '\x1b[31m%12.2f %15.4f %15.4f %10s\x1b[0m │ \x1b[32m%10s %15.2f %15.4f %15.4f\x1b[0m',
-      askPrice,
-      askQty,
-      askCumulatives[i],
-      '',
-      '',
-      bidPrice,
-      bidQty,
-      bidCumulatives[i]
-    );
+    const askPart = `${askPrice.toFixed(2).padStart(12)} ${askQty.toFixed(4).padStart(15)} ${askCumulatives[i].toFixed(4).padStart(15)}`;
+    const bidPart = `${bidPrice.toFixed(2).padStart(15)} ${bidQty.toFixed(4).padStart(15)} ${bidCumulatives[i].toFixed(4).padStart(15)}`;
+
+    console.log(`\x1b[31m${askPart}\x1b[0m │ ${bidPart}`);
   }
 
   console.log('─'.repeat(80));
