@@ -4,14 +4,27 @@
  * 或
  * pnpm test:run tests/binance.service.test.ts
  */
+/**
+ * BinanceService 单元测试
+ *
+ * 运行命令:
+ *   pnpm test tests/binance.service.test.ts     # 交互模式
+ *   pnpm test:run tests/binance.service.test.ts # 单次运行
+ *
+ * 测试覆盖:
+ *   - 服务实例创建
+ *   - 市场类型设置与切换
+ *   - 错误类功能
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BinanceService, BinanceServiceError } from '../src/services/binance.service.js';
+import { MarketType } from '../src/config/index.js';
 
 describe('BinanceService', () => {
   let service: BinanceService;
 
   beforeEach(() => {
-    service = new BinanceService('SPOT');
+    service = new BinanceService(MarketType.SPOT);
   });
 
   afterEach(() => {
