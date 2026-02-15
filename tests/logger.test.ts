@@ -1,8 +1,16 @@
 /**
+ * Logger 模块单元测试
+ *
  * 运行命令:
- * pnpm test tests/logger.test.ts
- * 或
- * pnpm test:run tests/logger.test.ts
+ *   pnpm test tests/logger.test.ts     # 交互模式
+ *   pnpm test:run tests/logger.test.ts # 单次运行
+ *
+ * 测试覆盖:
+ *   - Logger 实例创建
+ *   - 日志级别过滤
+ *   - 不同级别日志输出
+ *   - 订单簿格式化显示
+ *   - 订单簿统计信息显示
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {

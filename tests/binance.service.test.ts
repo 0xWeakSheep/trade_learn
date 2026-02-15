@@ -43,23 +43,23 @@ describe('BinanceService', () => {
    */
   it('默认市场类型应该是SPOT', () => {
     const defaultService = new BinanceService();
-    expect(defaultService.getMarketType()).toBe('SPOT');
+    expect(defaultService.getMarketType()).toBe(MarketType.SPOT);
   });
 
   /**
    * 测试: 可以设置市场类型为FUTURES
    */
   it('应该能设置市场类型为FUTURES', () => {
-    const futuresService = new BinanceService('FUTURES');
-    expect(futuresService.getMarketType()).toBe('FUTURES');
+    const futuresService = new BinanceService(MarketType.FUTURES);
+    expect(futuresService.getMarketType()).toBe(MarketType.FUTURES);
   });
 
   /**
    * 测试: 可以切换市场类型
    */
   it('应该能切换市场类型', () => {
-    service.setMarketType('FUTURES');
-    expect(service.getMarketType()).toBe('FUTURES');
+    service.setMarketType(MarketType.FUTURES);
+    expect(service.getMarketType()).toBe(MarketType.FUTURES);
   });
 
   /**

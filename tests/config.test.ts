@@ -1,8 +1,16 @@
 /**
+ * Config 模块单元测试
+ *
  * 运行命令:
- * pnpm test tests/config.test.ts
- * 或
- * pnpm test:run tests/config.test.ts
+ *   pnpm test tests/config.test.ts     # 交互模式
+ *   pnpm test:run tests/config.test.ts # 单次运行
+ *
+ * 测试覆盖:
+ *   - 交易配置默认值
+ *   - API 配置
+ *   - 应用环境配置
+ *   - 市场类型枚举
+ *   - 深度限制验证函数
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
