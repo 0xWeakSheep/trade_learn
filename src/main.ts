@@ -4,7 +4,7 @@
  * 或
  * pnpm ts-node src/main.ts
  */
-import { BINANCE_CONFIG, TRADING_CONFIG, APP_CONFIG } from './config/index.js';
+import { BINANCE_CONFIG, TRADING_CONFIG } from './config/index.js';
 import { logger, createLogger } from './utils/logger.js';
 import { BinanceService, type MarketType } from './services/binance.service.js';
 
