@@ -1,186 +1,368 @@
 /**
- * 运行命令:
- * pnpm dev
- * 或
- * pnpm ts-node src/main.ts
+ * Main entry point for trading bot
+ *
+ * Run commands:
+ * - pnpm dev                    # Run AS strategy in dry-run mode (default)
+ * - pnpm dev --mode=market-maker  # Run AS market maker
+ * - pnpm dev --mode=orderbook   # Run order book viewer
+ * - pnpm dev --live             # Run AS strategy with real orders (BE CAREFUL!)
  */
-import { BINANCE_CONFIG, TRADING_CONFIG, MarketType } from './config/index.js';
 import { createLogger } from './utils/logger.js';
-import { BinanceService } from './services/binance.service.js';
+import { ExchangeFactory, ExchangeType } from './exchanges/factory.js';
+import {
+  AvellanedaStoikovStrategy,
+  createASConfig,
+  AS_PRESETS,
+} from './strategies/as/index.js';
+import { IStrategy, StrategyConfig } from './strategies/interface.js';
+import { MarketType } from './config/index.js';
+import { BINANCE_CONFIG } from './config/index.js';
 
-// 创建专用logger
-const mainLogger = createLogger({ prefix: '[Main]' });
+const logger = createLogger({ prefix: '[Main]' });
 
 /**
- * 从命令行参数解析配置
+ * CLI Arguments
  */
-function parseArgs(): { symbol: string; limit: number; marketType: MarketType } {
-  const args = process.argv.slice(2);
-
-  let symbol = TRADING_CONFIG.DEFAULT_SYMBOL;
-  let limit = 20; // 默认显示前20档
-  let marketType: MarketType = MarketType.SPOT;
-
-  for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '--symbol':
-      case '-s':
-        symbol = args[++i]?.toUpperCase() || symbol;
-        break;
-      case '--limit':
-      case '-l':
-        limit = parseInt(args[++i], 10) || limit;
-        break;
-      case '--futures':
-      case '-f':
-        marketType = MarketType.FUTURES;
-        break;
-      case '--spot':
-        marketType = MarketType.SPOT;
-        break;
-      case '--help':
-      case '-h':
-        printHelp();
-        process.exit(0);
-    }
-  }
-
-  return { symbol, limit, marketType };
+interface CliArgs {
+  mode: 'market-maker' | 'orderbook';
+  symbol: string;
+  exchange: string;
+  preset: keyof typeof AS_PRESETS;
+  dryRun: boolean;
+  gamma?: number;
+  orderSize: number;
+  maxPosition: number;
+  updateInterval: number;
+  help: boolean;
 }
 
 /**
- * 打印帮助信息
+ * Parse command line arguments
+ */
+function parseArgs(): CliArgs {
+  const args = process.argv.slice(2);
+
+  const result: CliArgs = {
+    mode: 'market-maker',
+    symbol: 'BTCUSDT',
+    exchange: 'binance',
+    preset: 'moderate',
+    dryRun: true,
+    orderSize: 0.001,
+    maxPosition: 0.01,
+    updateInterval: 1000,
+    help: false,
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    switch (arg) {
+      case '--help':
+      case '-h':
+        result.help = true;
+        break;
+
+      case '--mode':
+        const mode = args[++i];
+        if (mode === 'market-maker' || mode === 'orderbook') {
+          result.mode = mode;
+        }
+        break;
+
+      case '--symbol':
+      case '-s':
+        result.symbol = (args[++i] || 'BTCUSDT').toUpperCase();
+        break;
+
+      case '--exchange':
+      case '-e':
+        result.exchange = args[++i] || 'binance';
+        break;
+
+      case '--preset':
+      case '-p':
+        const preset = args[++i] as keyof typeof AS_PRESETS;
+        if (preset in AS_PRESETS) {
+          result.preset = preset;
+        }
+        break;
+
+      case '--live':
+        result.dryRun = false;
+        break;
+
+      case '--dry-run':
+        result.dryRun = true;
+        break;
+
+      case '--gamma':
+      case '-g':
+        result.gamma = parseFloat(args[++i] || '0.5');
+        break;
+
+      case '--order-size':
+      case '-o':
+        result.orderSize = parseFloat(args[++i] || '0.001');
+        break;
+
+      case '--max-position':
+      case '-m':
+        result.maxPosition = parseFloat(args[++i] || '0.01');
+        break;
+
+      case '--interval':
+      case '-i':
+        result.updateInterval = parseInt(args[++i] || '1000', 10);
+        break;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Print help message
  */
 function printHelp(): void {
   console.log(`
-币安订单簿实时监控工具
+╔══════════════════════════════════════════════════════════════════════╗
+║           Avellaneda-Stoikov Market Maker Trading Bot                ║
+╚══════════════════════════════════════════════════════════════════════╝
 
-用法: pnpm dev [选项]
+Usage: pnpm dev [options]
 
-选项:
-  -s, --symbol <symbol>   交易对 (默认: BTCUSDT)
-  -l, --limit <number>    显示深度数量 (默认: 20)
-  -f, --futures           使用合约市场
-  --spot                  使用现货市场 (默认)
-  -h, --help              显示帮助信息
+Modes:
+  --mode market-maker    Run AS market maker strategy (default)
+  --mode orderbook       Run order book viewer only
 
-示例:
-  pnpm dev                          # 默认: BTCUSDT 现货 20档
-  pnpm dev --symbol ETHUSDT         # 查看ETH/USDT
-  pnpm dev -s ETHUSDT -l 10         # 查看ETH/USDT前10档
-  pnpm dev --futures                # 查看合约市场
-  pnpm dev -s BTCUSDT -f -l 50      # 查看BTC合约前50档
+Options:
+  -s, --symbol <symbol>     Trading pair (default: BTCUSDT)
+  -e, --exchange <type>     Exchange type (default: binance)
+  -p, --preset <preset>     Strategy preset: conservative|moderate|aggressive
+  -g, --gamma <value>       Risk aversion parameter (overrides preset)
+  -o, --order-size <size>   Base order size (default: 0.001)
+  -m, --max-position <pos>  Max position limit (default: 0.01)
+  -i, --interval <ms>       Update interval in ms (default: 1000)
+  --live                    Enable live trading (NOT dry-run)
+  --dry-run                 Enable dry-run mode (default)
+  -h, --help                Show this help message
+
+Examples:
+  # Run in dry-run mode with default settings
+  pnpm dev
+
+  # Run with aggressive preset on ETH
+  pnpm dev -s ETHUSDT -p aggressive
+
+  # Run in live mode (BE CAREFUL!)
+  pnpm dev --live -s BTCUSDT
+
+  # Run order book viewer
+  pnpm dev --mode orderbook -s BTCUSDT
+
+  # Custom gamma and order size
+  pnpm dev -g 0.3 -o 0.01 -m 0.1
+
+Safety Notes:
+  - Dry-run mode is enabled by default for safety
+  - Use --live only when you understand the risks
+  - Always set appropriate position limits
+  - Monitor the strategy closely when running live
 `);
 }
 
 /**
- * 清屏函数
+ * Run AS Market Maker Strategy
  */
-function clearScreen(): void {
-  console.clear();
+async function runMarketMaker(args: CliArgs): Promise<void> {
+  logger.info('═══════════════════════════════════════════════════════');
+  logger.info('   Avellaneda-Stoikov Market Maker Strategy');
+  logger.info('═══════════════════════════════════════════════════════');
+  logger.info(`Symbol:        ${args.symbol}`);
+  logger.info(`Exchange:      ${args.exchange}`);
+  logger.info(`Preset:        ${args.preset}`);
+  logger.info(`Dry Run:       ${args.dryRun}`);
+  logger.info(`Order Size:    ${args.orderSize}`);
+  logger.info(`Max Position:  ${args.maxPosition}`);
+  logger.info(`Update Int:    ${args.updateInterval}ms`);
+
+  if (!args.dryRun) {
+    logger.warn('⚠️  LIVE TRADING MODE - REAL ORDERS WILL BE PLACED!');
+    logger.warn('⚠️  Press Ctrl+C within 3 seconds to cancel...');
+    await sleep(3000);
+  }
+
+  // Check for API keys
+  if (!BINANCE_CONFIG.API_KEY || !BINANCE_CONFIG.SECRET_KEY) {
+    logger.warn('No API keys found. Running in simulation mode.');
+  }
+
+  // Create exchange
+  logger.info(`Connecting to ${args.exchange}...`);
+  const exchange = ExchangeFactory.create(args.exchange);
+  logger.info('Exchange connected');
+
+  // Get market info for precision
+  const orderBook = await exchange.getOrderBook(args.symbol, 5);
+  const midPrice = (orderBook.bids[0].price + orderBook.asks[0].price) / 2;
+  logger.info(`Current price: ${midPrice.toFixed(2)}`);
+
+  // Create strategy config
+  const presetConfig = AS_PRESETS[args.preset];
+  const asConfig = createASConfig({
+    symbol: args.symbol,
+    baseAsset: args.symbol.replace(/USDT|BUSD|USDC$/, ''),
+    quoteAsset: 'USDT',
+    gamma: args.gamma ?? presetConfig.gamma,
+    orderSize: args.orderSize,
+    maxPosition: args.maxPosition,
+    minPosition: -args.maxPosition,
+    updateIntervalMs: args.updateInterval,
+    dryRun: args.dryRun,
+    // Estimate tick size from order book
+    tickSize: 0.01,
+    lotSize: 0.0001,
+  });
+
+  // Create base strategy config
+  const strategyConfig: StrategyConfig = {
+    name: `AS-${args.symbol}`,
+    symbol: args.symbol,
+    quoteAsset: asConfig.quoteAsset,
+    baseAsset: asConfig.baseAsset,
+    orderSize: asConfig.orderSize,
+    tickSize: asConfig.tickSize,
+    lotSize: asConfig.lotSize,
+    maxPosition: asConfig.maxPosition,
+    minPosition: asConfig.minPosition,
+    updateIntervalMs: asConfig.updateIntervalMs,
+    dryRun: asConfig.dryRun,
+  };
+
+  // Create and run strategy
+  const strategy = new AvellanedaStoikovStrategy();
+  await strategy.initialize(exchange, strategyConfig);
+
+  // Handle events
+  strategy.on('ORDER_FILLED', (event) => {
+    logger.info('Order filled:', event.data);
+  });
+
+  strategy.on('ERROR', (event) => {
+    logger.error('Strategy error:', event.data);
+  });
+
+  // Start strategy
+  await strategy.start();
+
+  // Handle shutdown
+  process.on('SIGINT', async () => {
+    logger.info('\nReceived SIGINT, shutting down gracefully...');
+    await strategy.stop();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    logger.info('\nReceived SIGTERM, shutting down gracefully...');
+    await strategy.stop();
+    process.exit(0);
+  });
 }
 
 /**
- * 打印订单簿
+ * Run Order Book Viewer
  */
-function printOrderBook(
-  symbol: string,
-  bids: { price: string; quantity: string }[],
-  asks: { price: string; quantity: string }[],
-  displayCount: number
-): void {
-  clearScreen();
+async function runOrderBook(args: CliArgs): Promise<void> {
+  const { BinanceService } = await import('./services/binance.service.js');
 
-  const count = Math.min(displayCount, bids.length, asks.length);
+  const binanceService = new BinanceService(MarketType.SPOT);
+  const limit = 20;
 
-  console.log('='.repeat(80));
-  console.log(`📊 币安订单簿 | ${symbol} | ${count}档深度 | ${new Date().toLocaleTimeString()}`);
-  console.log('='.repeat(80));
+  logger.info(`Starting order book viewer for ${args.symbol}...`);
 
-  // 表头
-  const askHeader = `${'卖价(Ask)'.padStart(12)} ${'数量'.padStart(15)} ${'累计'.padStart(15)}`;
-  const bidHeader = `${'买价(Bid)'.padStart(15)} ${'数量'.padStart(15)} ${'累计'.padStart(15)}`;
-  console.log(`\x1b[31m${askHeader}\x1b[0m │ \x1b[32m${bidHeader}\x1b[0m`);
-  console.log('─'.repeat(80));
+  // Clear screen function
+  const clearScreen = () => {
+    console.clear();
+  };
 
-  // 计算累计
-  let askCumulative = 0;
-  let bidCumulative = 0;
-  const askCumulatives: number[] = [];
-  const bidCumulatives: number[] = [];
+  // Print order book function
+  const printOrderBook = (
+    symbol: string,
+    bids: { price: string; quantity: string }[],
+    asks: { price: string; quantity: string }[],
+    displayCount: number
+  ): void => {
+    clearScreen();
 
-  for (let i = 0; i < count; i++) {
-    askCumulative += parseFloat(asks[i].quantity);
-    bidCumulative += parseFloat(bids[i].quantity);
-    askCumulatives.push(askCumulative);
-    bidCumulatives.push(bidCumulative);
-  }
+    const count = Math.min(displayCount, bids.length, asks.length);
 
-  // 打印数据 - 卖盘从上到下(价高到低)，买盘从上到下(价高到低对应asks[i])
-  for (let i = count - 1; i >= 0; i--) {
-    const askPrice = parseFloat(asks[i].price);
-    const askQty = parseFloat(asks[i].quantity);
-    const bidPrice = parseFloat(bids[i].price);
-    const bidQty = parseFloat(bids[i].quantity);
+    console.log('='.repeat(80));
+    console.log(`📊 币安订单簿 | ${symbol} | ${count}档深度 | ${new Date().toLocaleTimeString()}`);
+    console.log('='.repeat(80));
 
-    const askPart = `${askPrice.toFixed(2).padStart(12)} ${askQty.toFixed(4).padStart(15)} ${askCumulatives[i].toFixed(4).padStart(15)}`;
-    const bidPart = `${bidPrice.toFixed(2).padStart(15)} ${bidQty.toFixed(4).padStart(15)} ${bidCumulatives[i].toFixed(4).padStart(15)}`;
+    // Header
+    const askHeader = `${'卖价(Ask)'.padStart(12)} ${'数量'.padStart(15)} ${'累计'.padStart(15)}`;
+    const bidHeader = `${'买价(Bid)'.padStart(15)} ${'数量'.padStart(15)} ${'累计'.padStart(15)}`;
+    console.log(`\x1b[31m${askHeader}\x1b[0m │ \x1b[32m${bidHeader}\x1b[0m`);
+    console.log('─'.repeat(80));
 
-    console.log(`\x1b[31m${askPart}\x1b[0m │ ${bidPart}`);
-  }
+    // Calculate cumulative
+    let askCumulative = 0;
+    let bidCumulative = 0;
+    const askCumulatives: number[] = [];
+    const bidCumulatives: number[] = [];
 
-  console.log('─'.repeat(80));
-  const bestAsk = parseFloat(asks[0].price);
-  const bestBid = parseFloat(bids[0].price);
-  const spread = bestAsk - bestBid;
-  const spreadPercent = (spread / bestBid) * 100;
+    for (let i = 0; i < count; i++) {
+      askCumulative += parseFloat(asks[i].quantity);
+      bidCumulative += parseFloat(bids[i].quantity);
+      askCumulatives.push(askCumulative);
+      bidCumulatives.push(bidCumulative);
+    }
 
-  console.log(
-    `卖一: \x1b[31m${bestAsk.toFixed(2)}\x1b[0m | ` +
-    `买一: \x1b[32m${bestBid.toFixed(2)}\x1b[0m | ` +
-    `价差: \x1b[33m${spread.toFixed(2)} (${spreadPercent.toFixed(4)}%)\x1b[0m`
-  );
-  console.log('='.repeat(80));
-  console.log('按 Ctrl+C 退出');
-}
+    // Print data
+    for (let i = count - 1; i >= 0; i--) {
+      const askPrice = parseFloat(asks[i].price);
+      const askQty = parseFloat(asks[i].quantity);
+      const bidPrice = parseFloat(bids[i].price);
+      const bidQty = parseFloat(bids[i].quantity);
 
-/**
- * 主函数
- */
-async function main(): Promise<void> {
-  const { symbol, limit, marketType } = parseArgs();
+      const askPart = `${askPrice.toFixed(2).padStart(12)} ${askQty.toFixed(4).padStart(15)} ${askCumulatives[i].toFixed(4).padStart(15)}`;
+      const bidPart = `${bidPrice.toFixed(2).padStart(15)} ${bidQty.toFixed(4).padStart(15)} ${bidCumulatives[i].toFixed(4).padStart(15)}`;
 
-  mainLogger.info('启动币安订单簿监控...');
-  mainLogger.info(`交易对: ${symbol}, 市场: ${marketType}, 深度: ${limit}`);
+      console.log(`\x1b[31m${askPart}\x1b[0m │ ${bidPart}`);
+    }
 
-  // 检查API Key (可选，订单簿是公开数据)
-  if (!BINANCE_CONFIG.API_KEY) {
-    mainLogger.info('使用公开API模式 (无需API Key)');
-  }
+    console.log('─'.repeat(80));
+    const bestAsk = parseFloat(asks[0].price);
+    const bestBid = parseFloat(bids[0].price);
+    const spread = bestAsk - bestBid;
+    const spreadPercent = (spread / bestBid) * 100;
 
-  // 创建服务实例
-  const binanceService = new BinanceService(marketType);
+    console.log(
+      `卖一: \x1b[31m${bestAsk.toFixed(2)}\x1b[0m | ` +
+      `买一: \x1b[32m${bestBid.toFixed(2)}\x1b[0m | ` +
+      `价差: \x1b[33m${spread.toFixed(2)} (${spreadPercent.toFixed(4)}%)\x1b[0m`
+    );
+    console.log('='.repeat(80));
+    console.log('按 Ctrl+C 退出');
+  };
 
-  // 首次获取数据
-  try {
-    const initialData = await binanceService.getOrderBook(symbol, limit);
-    printOrderBook(symbol, initialData.bids, initialData.asks, limit);
-  } catch (error) {
-    mainLogger.error('获取初始数据失败:', error);
-    process.exit(1);
-  }
+  // Initial fetch
+  const initialData = await binanceService.getOrderBook(args.symbol, limit);
+  printOrderBook(args.symbol, initialData.bids, initialData.asks, limit);
 
-  // 设置定时刷新
+  // Start update loop
   const intervalId = setInterval(async () => {
     try {
-      const data = await binanceService.getOrderBook(symbol, limit);
-      printOrderBook(symbol, data.bids, data.asks, limit);
+      const data = await binanceService.getOrderBook(args.symbol, limit);
+      printOrderBook(args.symbol, data.bids, data.asks, limit);
     } catch (error) {
-      mainLogger.error('刷新数据失败:', error);
+      logger.error('Refresh failed:', error);
     }
-  }, 1000); // 每秒刷新
+  }, 1000);
 
-  // 处理退出
+  // Handle shutdown
   process.on('SIGINT', () => {
     console.log('\n\n正在关闭...');
     clearInterval(intervalId);
@@ -193,8 +375,41 @@ async function main(): Promise<void> {
   });
 }
 
-// 运行应用
-main().catch((error) => {
-  console.error('应用错误:', error);
-  process.exit(1);
-});
+/**
+ * Sleep utility
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Main function
+ */
+async function main(): Promise<void> {
+  const args = parseArgs();
+
+  if (args.help) {
+    printHelp();
+    process.exit(0);
+  }
+
+  try {
+    switch (args.mode) {
+      case 'market-maker':
+        await runMarketMaker(args);
+        break;
+      case 'orderbook':
+        await runOrderBook(args);
+        break;
+      default:
+        logger.error(`Unknown mode: ${args.mode}`);
+        process.exit(1);
+    }
+  } catch (error) {
+    logger.error('Fatal error:', error);
+    process.exit(1);
+  }
+}
+
+// Run main
+main();
