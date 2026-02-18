@@ -1,45 +1,27 @@
 /**
- * Avellaneda-Stoikov Strategy Configuration
- *
- * Default configuration and configuration builder
+ * Configuration builder and validator
  */
 import { ASConfig } from './types.js';
+import { AS_PRESETS, ASPreset } from './presets.js';
 
-/**
- * Default AS strategy configuration
- */
-export const DEFAULT_AS_CONFIG: Partial<ASConfig> = {
-  // Model parameters
+const DEFAULT_AS_CONFIG: Partial<ASConfig> = {
   gamma: 0.5,
-
-  // Order management
   maxSpreadMultiplier: 3.0,
   minSpread: 0.01,
-
-  // Inventory management
   targetInventory: 0,
-
-  // Execution
   updateIntervalMs: 1000,
   volatilityWindow: 100,
   kappaWindow: 50,
-
-  // Safety
   dryRun: true,
   stopLossThreshold: -1000,
 };
 
-/**
- * Create AS configuration with defaults
- */
 export function createASConfig(config: Partial<ASConfig>): ASConfig {
-  // Extract base and quote assets from symbol
   const symbol = config.symbol || 'BTCUSDT';
   const baseAsset = config.baseAsset || symbol.replace(/USDT|BUSD|USDC$/, '');
   const quoteAsset = config.quoteAsset || 'USDT';
 
   return {
-    // Required fields with defaults
     name: config.name || `AS-${symbol}`,
     symbol,
     baseAsset,
@@ -50,7 +32,6 @@ export function createASConfig(config: Partial<ASConfig>): ASConfig {
     tickSize: config.tickSize || 0.01,
     lotSize: config.lotSize || 0.0001,
 
-    // Merge with defaults
     gamma: config.gamma ?? DEFAULT_AS_CONFIG.gamma!,
     maxSpreadMultiplier: config.maxSpreadMultiplier ?? DEFAULT_AS_CONFIG.maxSpreadMultiplier!,
     minSpread: config.minSpread ?? DEFAULT_AS_CONFIG.minSpread!,
@@ -61,55 +42,13 @@ export function createASConfig(config: Partial<ASConfig>): ASConfig {
     dryRun: config.dryRun ?? DEFAULT_AS_CONFIG.dryRun!,
     stopLossThreshold: config.stopLossThreshold ?? DEFAULT_AS_CONFIG.stopLossThreshold!,
 
-    // Optional calculated fields
     kappa: config.kappa,
     sigma: config.sigma,
   };
 }
 
-/**
- * Preset configurations for different market conditions
- */
-export const AS_PRESETS = {
-  /**
-   * Conservative preset - wider spreads, more inventory targeting
-   * Good for: Low liquidity, volatile markets
-   */
-  conservative: {
-    gamma: 1.0,
-    maxSpreadMultiplier: 4.0,
-    minSpread: 0.02,
-    updateIntervalMs: 2000,
-  },
-
-  /**
-   * Moderate preset - balanced approach
-   * Good for: Normal market conditions
-   */
-  moderate: {
-    gamma: 0.5,
-    maxSpreadMultiplier: 3.0,
-    minSpread: 0.01,
-    updateIntervalMs: 1000,
-  },
-
-  /**
-   * Aggressive preset - tighter spreads, less inventory targeting
-   * Good for: High liquidity, stable markets
-   */
-  aggressive: {
-    gamma: 0.1,
-    maxSpreadMultiplier: 2.0,
-    minSpread: 0.005,
-    updateIntervalMs: 500,
-  },
-} as const;
-
-/**
- * Create config from preset
- */
 export function createASConfigFromPreset(
-  preset: keyof typeof AS_PRESETS,
+  preset: ASPreset,
   overrides: Partial<ASConfig> = {}
 ): ASConfig {
   const presetConfig = AS_PRESETS[preset];
@@ -119,9 +58,6 @@ export function createASConfigFromPreset(
   });
 }
 
-/**
- * Validate AS configuration
- */
 export function validateASConfig(config: ASConfig): string[] {
   const errors: string[] = [];
 
